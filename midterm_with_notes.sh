@@ -33,7 +33,7 @@ REPORT_BRANCH_NAME="$4"
 
 # Extract repository name and owner from the code repository URL
 REPOSITORY_NAME_CODE=$(basename "$CODE_REPO_URL" .git) #The basename command strips the .git extension from the URL.
-REPOSITORY_OWNER=$(basename "$(dirname "$CODE_REPO_URL")") #In this case, it strips the repository name from the URL.
+REPOSITORY_OWNER=$(echo "$CODE_REPO_URL" | awk -F':' '{print $2}' | awk -F'/' '{print $1}') #In this case, it strips the repository name from the URL.
 
 # Extract repository name from the report repository URL
 REPOSITORY_NAME_REPORT=$(basename "$REPORT_REPO_URL" .git)
@@ -279,18 +279,25 @@ while true; do
                 github_post_request "https://api.github.com/repos/${REPOSITORY_OWNER}/${REPOSITORY_NAME_CODE}/issues" "$REQUEST_PATH" "$RESPONSE_PATH" #The github_post_request function is used to create an issue on the code repository.
 
                 ISSUE_NUMBER=$(cat "$RESPONSE_PATH" | jq --raw-output ".number") #The issue number is stored in the ISSUE_NUMBER variable.
+                echo "$ISSUE_NUMBER" #The issue number is printed to the standard output.
 
-                # Create a comment on the report repository
-                COMMENT_BODY="Failed tests: https://${REPOSITORY_OWNER}.github.io/${REPOSITORY_NAME_REPORT}/$REPORT_PATH/pytest.html" #A message is stored in the COMMENT_BODY variable.
+                rm $RESPONSE_PATH #The RESPONSE_PATH file is removed.
+                rm $REQUEST_PATH    #The REQUEST_PATH file is removed.
+                BODY="" #The BODY variable is set to an empty string.
+                rm -rf $PYTEST_REPORT_PATH #The PYTEST_REPORT_PATH directory is removed.
+                rm -rf $BLACK_OUTPUT_PATH #The BLACK_OUTPUT_PATH directory is removed.
+                rm -rf $BLACK_REPORT_PATH #The BLACK_REPORT_PATH directory is removed.
+                rm -rf $REPORT_PATH #The REPORT_PATH directory is removed.
 
-                if [[ -n "$AUTHOR_USERNAME" ]]; then #If the author's username is not empty, then the script will continue.
-                    COMMENT_BODY+="\n\n@${AUTHOR_USERNAME}" #A message is added to the COMMENT_BODY variable.
-                fi
+            else
+                REMOTE_NAME=$(git remote) #The remote name is stored in the REMOTE_NAME variable.
+                git tag --force "${CODE_BRANCH_NAME}-ci-success" $COMMIT #The git tag command is used to tag the commit.
+                git push --force $REMOTE_NAME --tags #The git push command is used to push the tags to the remote repository.
 
-                github_post_request "https://api.github.com/repos/${REPOSITORY_OWNER}/${REPOSITORY_NAME_REPORT}/issues/${ISSUE_NUMBER}/comments" <(echo "{\"body\":\"${COMMENT_BODY}\"}") "$RESPONSE_PATH" #The github_post_request function is used to create a comment on the report repository.
+
             fi
         done #The for loop is closed.
     fi
 
-    sleep 30 #The script will sleep for 30 seconds.
+    sleep 15 #The script will sleep for 15 seconds.
 done #The while loop is closed.

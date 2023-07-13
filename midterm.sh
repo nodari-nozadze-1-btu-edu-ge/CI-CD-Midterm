@@ -33,7 +33,7 @@ REPORT_BRANCH_NAME="$4"
 
 # Extract repository name and owner from the code repository URL
 REPOSITORY_NAME_CODE=$(basename "$CODE_REPO_URL" .git)
-REPOSITORY_OWNER=$(basename "$(dirname "$CODE_REPO_URL")")
+REPOSITORY_OWNER=$(echo "$CODE_REPO_URL" | awk -F':' '{print $2}' | awk -F'/' '{print $1}')
 
 # Extract repository name from the report repository URL
 REPOSITORY_NAME_REPORT=$(basename "$REPORT_REPO_URL" .git)
@@ -278,18 +278,25 @@ while true; do
                 github_post_request "https://api.github.com/repos/${REPOSITORY_OWNER}/${REPOSITORY_NAME_CODE}/issues" "$REQUEST_PATH" "$RESPONSE_PATH"
 
                 ISSUE_NUMBER=$(cat "$RESPONSE_PATH" | jq --raw-output ".number")
+                echo "$ISSUE_NUMBER"
+                
 
-                # Create a comment on the report repository
-                COMMENT_BODY="Failed tests: https://${REPOSITORY_OWNER}.github.io/${REPOSITORY_NAME_REPORT}/$REPORT_PATH/pytest.html"
+                rm $RESPONSE_PATH
+                rm $REQUEST_PATH
+                BODY=""
+                rm -rf $PYTEST_REPORT_PATH
+                rm -rf $BLACK_OUTPUT_PATH
+                rm -rf $BLACK_REPORT_PATH
+                rm -rf $REPORT_PATH
 
-                if [[ -n "$AUTHOR_USERNAME" ]]; then
-                    COMMENT_BODY+="\n\n@${AUTHOR_USERNAME}"
-                fi
+            else
+                REMOTE_NAME=$(git remote)
+                git tag --force "${CODE_BRANCH_NAME}-ci-success" $COMMIT
+                git push --force $REMOTE_NAME --tags
 
-                github_post_request "https://api.github.com/repos/${REPOSITORY_OWNER}/${REPOSITORY_NAME_REPORT}/issues/${ISSUE_NUMBER}/comments" <(echo "{\"body\":\"${COMMENT_BODY}\"}") "$RESPONSE_PATH"
             fi
         done
     fi
 
-    sleep 30
+    sleep 15
 done
